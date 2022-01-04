@@ -137,5 +137,9 @@ __azurite_db*__.json
 # Data
 /data
 
+# Config
+config.json
+logger_config.json
+
 # VSCode
 .vscode/
