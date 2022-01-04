@@ -1,0 +1,22 @@
+To do list:
+
+
+1. Logger bot voor bot performance en portfolio monitoring +
+2. Backtesting FOMO bot v1 met
+3. Dataset creeren met historische tickdata meerdere exchanges
+4. ML trading bot (LambdaMART, Time Series, etc)
+5. Dashboards + (uibreiden met percentage growth en btc/eth benchmark en overzicht van actuele holdings )
+6. Data verkopen?
+7. Shadow trading bots (momentum strat, In)
+8. Efficientere order execution (holden ipv buy&sell, limit orders)
+9. Alerting van buy/sell/error
+10. Andere crypto bots bestuderen
+
+
+Ideeen:
+1. Arbitrage trading (tussen echanges en tussen trading pairs)
+2. Deep Learning bots met NLP en Block Chain data
+
+
+google-api-python-client==2.33.0
+google-cloud-storage==1.43.0
