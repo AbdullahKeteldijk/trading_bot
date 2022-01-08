@@ -11,6 +11,7 @@ To do list:
 8. Efficientere order execution (holden ipv buy&sell, limit orders)
 9. Alerting van buy/sell/error
 10. Andere crypto bots bestuderen
+11. Trading stop trigger aanpassen
 
 
 Ideeen:
