@@ -2,9 +2,9 @@ To do list:
 
 
 1. Logger bot voor bot performance en portfolio monitoring +
-2. Backtesting FOMO bot v1 met
+2. Backtesting FOMO bot v1 met +
 3. Dataset creeren met historische tickdata meerdere exchanges
-4. ML trading bot (LambdaMART, Time Series, etc)
+4. ML trading bot (LambdaMART, Time Series, NLP, etc)
 5. Dashboards + (uibreiden met percentage growth en btc/eth benchmark en overzicht van actuele holdings )
 6. Data verkopen?
 7. Shadow trading bots (momentum strat, In)
