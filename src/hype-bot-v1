@@ -1,0 +1,134 @@
+import base64
+import json
+import ccxt
+
+import pandas as pd
+import numpy as np
+import logging
+
+from datetime import datetime
+
+from google.cloud import storage
+
+config = json.load(open('config.json'))
+EXCHANGE = ccxt.binance({
+    "apiKey": config["BINANCE_API_KEY"],
+    "secret": config["BINANCE_SECRET_KEY"]
+})
+
+
+def select_pairs(pairs, hours):
+    """ Sort trading pairs by performance and return dataframe"""
+    columns = ["Date", "Open", "High", "Low", "Close", "Volume"]
+    
+    pairs_perc = []
+
+    for i, pair in enumerate(pairs):
+        try:
+            data = EXCHANGE.fetch_ohlcv(pair, "1h")
+            df_temp = pd.DataFrame.from_records(data, columns=columns)
+            percentage = (df_temp["Close"].iloc[-1] / df_temp["Close"].iloc[-1-hours]) - 1
+            pairs_perc.append([pair, percentage])
+        except Exception as e:
+            logging.warning(f"Could not fetch {pair}")
+            logging.warning(f"{e}")
+            
+
+    df_pairs_perc = pd.DataFrame(pairs_perc, columns=["pair", "percentage"])
+    df_pairs_perc = df_pairs_perc.sort_values(by=['percentage'], ascending=False)
+    
+    return df_pairs_perc
+
+def filter_pairs(pairs):
+    ''' Filter pairs and return only top 200 pairs'''
+    # Add filtering for top XXX coins ?
+    
+    pairs_data = EXCHANGE.fetch_tickers()
+    volume_pairs = []
+    
+    for pair in pairs: 
+        # De if statement kan worden uitgebreid met logica om te zien of het volume substantieel is.
+        if pairs_data[pair]["baseVolume"]>0 or pairs_data[pair]["quoteVolume"]>0:
+            volume_pairs.append(pair)
+    
+    non_derivative_pairs = [pair for pair in volume_pairs if "DOWN" not in pair if "UP" not in pair]
+    non_leveraged_pairs = [pair for pair in non_derivative_pairs if "BULL" not in pair if "BEAR" not in pair]
+    
+    return non_derivative_pairs
+    
+def open_json(path):
+
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket('portfolio_logger')
+    blob = bucket.blob('hype_bot/orders/hype_bot_orders.json')
+
+    # Download the contents of the blob as a string and then parse it using json.loads() method
+    data = json.loads(blob.download_as_string(client=None))
+    
+    return data
+
+def save_json(name, amount):
+
+    dict_ = {}
+    dict_["name"] = name
+    dict_["amount"] = amount
+    dict_["datetime"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket('portfolio_logger')
+    blob = bucket.blob('hype_bot/orders/hype_bot_orders.json')
+    blob.upload_from_string(data=json.dumps(dict_),content_type='application/json')  
+
+def place_market_order(pairs):
+    """ Place buy and sell ordered based on trend"""
+    
+    unfiltered_pairs = pairs["pair"].values
+    # print(pairs)
+    filtered_pairs = filter_pairs(unfiltered_pairs)
+    # print(filtered_pairs[:10])
+    top_1_pair = filtered_pairs[0]
+    top_1_coin = top_1_pair.replace("/USDT", "")
+    orders = open_json('gs://portfolio_logger/hype_bot/orders/hype_bot_orders.json')
+    
+    coin = orders["name"]
+    token_pair = f"{coin}/USDT"
+
+    if coin != top_1_coin:
+
+        try:
+            ## Sell
+            amount_sell = EXCHANGE.fetch_balance()[coin]["free"]
+
+            print(f"Sell: {coin}, Amount: {amount_sell}")
+            # EXCHANGE.create_market_sell_order(coin, amount_sell)
+        except Exception as e:
+            print(f"Could not sell {coin}")
+            print(e)
+
+        try:
+            ## Buy
+            cash = EXCHANGE.fetch_balance()["USDT"]["free"]
+            amount_buy = EXCHANGE.fetch_tickers()[top_1_pair]["ask"] * cash
+            print(f"Buy: {top_1_pair}, Amount: {amount_buy}")
+            # EXCHANGE.create_market_buy_order(top_1_pair, value_buy)
+            save_json(top_1_coin, amount_buy)
+        except Exception as e:
+            print(f"Could not buy {top_1_pair}")
+            print(e)
+
+    else:
+        print(f"{coin} is still the top coin. Trade is skipped")
+
+def main(event, context):
+
+    hours = 24
+    pairs = [key for key in EXCHANGE.fetch_tickers().keys() if "/USDT" in key]
+    df_pairs = select_pairs(pairs, hours)
+
+    place_market_order(df_pairs)
+
+    pubsub_message = base64.b64decode(event['data']).decode('utf-8')
+    print(pubsub_message)
+
+if __name__=="__main__":
+    main(event, context)
