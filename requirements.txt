@@ -6,3 +6,4 @@ numpy==1.21.5
 ccxt==1.65.38
 yahoo_fin==0.8.9.1
 python-binance==1.0.15
+requests-html==0.10.0
