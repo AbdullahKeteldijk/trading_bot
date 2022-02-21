@@ -7,7 +7,7 @@ import logging
 import pandas as pd
 import numpy as np
 
-from yahoo_fin.stock_info import get_top_crypto
+from get_top_crypto import get_top_crypto
 from binance.client import Client
 
 config = json.load(open('config.json'))
@@ -61,16 +61,24 @@ def split_cash(cash, pairs):
     isstable = []
     
     for pair in pairs:
-
-        if pair not in isstable:
+        try:
             ask_price = tickers[pair]["ask"]
-            allocation = (1 / len(pairs)) # Allocation buckets maken zodat meerdere trading bots kunnen opereren op hetzelfde account
-            available_cash = ( cash * 0.975 ) # Keep some cash in reserve to accomodate for price fluctuations
-            coin_amount =  (allocation * available_cash) / ask_price 
-            coin_allocation[pair] = [round(coin_amount, 8), ask_price]
-        else:
-            pass
-    
+            print("ask price:", ask_price)
+            print("ask price > 0", ask_price > 0)
+            print("ask price > 0.00000001", ask_price > 0.00000001)
+            print("pair not in isstable", pair not in isstable)
+            print("pair not in isstable or ask_price > 0", pair not in isstable and ask_price > 0)
+            if pair not in isstable and ask_price > 0:                
+                allocation = (1 / len(pairs)) # Allocation buckets maken zodat meerdere trading bots kunnen opereren op hetzelfde account
+                available_cash = ( cash * 0.98 ) # Keep some cash in reserve to accomodate for price fluctuations
+                coin_amount =  (allocation * available_cash) / ask_price 
+                coin_allocation[pair] = [round(coin_amount, 8), ask_price]
+            else:
+                pass
+        except Exception as e:
+            print(f"Could not buy {pair}")
+            print(e)
+        
     return coin_allocation
 
 def check_market_down():
@@ -92,16 +100,12 @@ def sell_dust():
     balance = EXCHANGE.fetch_balance()
     
     not_keys = ['info', 'BNB', 'timestamp', 'datetime', 'free', 'used', 'total']
-    tokens = [token for token in list(balance.keys()) if token not in not_keys]
+    tokens = [token for token in list(balance.keys()) if token not in not_keys if balance[token]["free"] > 0]
     
-    for token in tokens:
-        try:
-            if balance[token]["free"] > 0:
-                print(f"Sold dust: {token}")
-                binance_client.transfer_dust(asset=token)
-        except Exception as e:
-            print(f"Could not sell dust: {token}")
-            print(e)
+    try:
+        binance_client.transfer_dust(asset=tokens)
+    except Exception as e:
+        print(e)
 
     if balance["BNB"]["free"] > 0:
         try:
@@ -137,22 +141,29 @@ def place_market_order(pairs):
             except Exception as e:
                 logging.warning(f"Could not sell Coin: {coin}, Amount: {value}, Bid:{bid_price}")
                 logging.warning(e)
-                
+
+    print("sold")          
     cash = EXCHANGE.fetch_balance()["BUSD"]["free"]
-    sell_dust()
+    # sell_dust()
+    print("cash")
     coin_allocation = split_cash(cash, top_10)
+    print("allocation")
     
     # Buy
     for coin, value in coin_allocation.items():
         if market_down == False: # Check if overall market is down. If True, we will not reenter the market until next period
+            print("Market up")
             try:
                 print(f"Buy: {coin}, Amount: {value[0]}, Ask: {value[1]}")
                 EXCHANGE.create_market_buy_order(coin, value[0])
+                print("bought")
             except Exception as e:
                 logging.warning(f"Could not buy Coin: {coin}, Amount: {value[0]}, Ask:{value[1]}")
                 logging.warning(e)
+        else:
+            print("Market down")
 
-
+    print("Done")
     
     return None
 
@@ -169,5 +180,3 @@ def main(event, context):
 
 if __name__=="__main__":
     main(event, context)
-
-
